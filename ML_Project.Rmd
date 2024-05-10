@@ -1,0 +1,566 @@
+---
+title: "ML_Project"
+author: "Cyan Chou"
+date: "2024-04-09"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(leaps)
+library(glmnet)
+library(caret)
+library(class)
+library(ggplot2)
+library(plotmo)
+library(tree)
+library(randomForest)
+library(gbm)
+library(pROC)
+
+library(kableExtra)
+```
+
+```{r}
+# Read a CSV file into a data frame
+my_data <- read.csv("/Users/cyan/Documents/machine learning/heart_failure_clinical_records_dataset.csv")
+
+# Printing the first six rows
+head(my_data)
+# Printing the number of observations
+nrow(my_data)
+```
+# check missing
+```{r}
+# Count of missing values by variable
+my_data %>% summarise_all(~sum(is.na(.)))
+# Proportion of missing values by variable
+my_data %>% summarise_all(~mean(is.na(.)))
+```
+
+# Statistical quantitative description of all features
+numeric
+```{r}
+summary(my_data$age)
+sd(my_data$age)
+range(my_data$age)
+IQR(my_data$age)
+
+summary(my_data$creatinine_phosphokinase)
+sd(my_data$creatinine_phosphokinase)
+range(my_data$creatinine_phosphokinase)
+IQR(my_data$creatinine_phosphokinase)
+
+summary(my_data$ejection_fraction)
+sd(my_data$ejection_fraction)
+range(my_data$ejection_fraction)
+IQR(my_data$ejection_fraction)
+
+summary(my_data$platelets)
+sd(my_data$platelets)
+range(my_data$platelets)
+IQR(my_data$platelets)
+
+summary(my_data$serum_creatinine)
+sd(my_data$serum_creatinine)
+range(my_data$serum_creatinine)
+IQR(my_data$serum_creatinine)
+
+summary(my_data$serum_sodium)
+sd(my_data$serum_sodium)
+range(my_data$serum_sodium)
+IQR(my_data$serum_sodium)
+
+summary(my_data$time)
+sd(my_data$time)
+range(my_data$time)
+IQR(my_data$time)
+```
+categorical
+```{r}
+df_summary <- my_data %>%
+  group_by(anaemia) %>%
+  summarise(Frequency = n(),
+            Portion = n() / nrow(my_data))
+print(df_summary)
+
+df_summary <- my_data %>%
+  group_by(diabetes) %>%
+  summarise(Frequency = n(),
+            Portion = n() / nrow(my_data))
+print(df_summary)
+
+df_summary <- my_data %>%
+  group_by(high_blood_pressure) %>%
+  summarise(Frequency = n(),
+            Portion = n() / nrow(my_data))
+print(df_summary)
+
+df_summary <- my_data %>%
+  group_by(sex) %>%
+  summarise(Frequency = n(),
+            Portion = n() / nrow(my_data))
+print(df_summary)
+
+df_summary <- my_data %>%
+  group_by(smoking) %>%
+  summarise(Frequency = n(),
+            Portion = n() / nrow(my_data))
+print(df_summary)
+
+df_summary <- my_data %>%
+  group_by(DEATH_EVENT) %>%
+  summarise(Frequency = n(),
+            Portion = n() / nrow(my_data))
+print(df_summary)
+```
+statistics in different groups divided by outcome
+```{r}
+my_data %>% 
+  group_by(DEATH_EVENT) %>%
+  summarize(
+    mean = mean(age),
+    median = median(age),
+     sd = sd(age, na.rm = TRUE),
+    range = range(age),
+    IQR = IQR(age)
+  )
+
+my_data %>% 
+  group_by(DEATH_EVENT) %>%
+  summarize(
+    mean = mean(creatinine_phosphokinase),
+    median = median(creatinine_phosphokinase),
+     sd = sd(creatinine_phosphokinase, na.rm = TRUE),
+    range = range(creatinine_phosphokinase),
+    IQR = IQR(creatinine_phosphokinase)
+  )
+
+my_data %>% 
+  group_by(DEATH_EVENT) %>%
+  summarize(
+    mean = mean(ejection_fraction),
+    median = median(ejection_fraction),
+     sd = sd(ejection_fraction, na.rm = TRUE),
+    range = range(ejection_fraction),
+    IQR = IQR(ejection_fraction)
+  )
+
+my_data %>% 
+  group_by(DEATH_EVENT) %>%
+  summarize(
+    mean = mean(platelets),
+    median = median(platelets),
+     sd = sd(platelets, na.rm = TRUE),
+    range = range(platelets),
+    IQR = IQR(platelets)
+  )
+
+my_data %>% 
+  group_by(DEATH_EVENT) %>%
+  summarize(
+    mean = mean(serum_creatinine),
+    median = median(serum_creatinine),
+     sd = sd(serum_creatinine, na.rm = TRUE),
+    range = range(serum_creatinine),
+    IQR = IQR(serum_creatinine)
+  )
+
+my_data %>% 
+  group_by(DEATH_EVENT) %>%
+  summarize(
+    mean = mean(serum_sodium),
+    median = median(serum_sodium),
+     sd = sd(serum_sodium, na.rm = TRUE),
+    range = range(serum_sodium),
+    IQR = IQR(serum_sodium)
+  )
+
+my_data %>% 
+  group_by(DEATH_EVENT) %>%
+  summarize(
+    mean = mean(time),
+    median = median(time),
+     sd = sd(time, na.rm = TRUE),
+    range = range(time),
+    IQR = IQR(time)
+  )
+```
+```{r}
+my_data %>%
+  group_by(DEATH_EVENT) %>%
+  count(anaemia) %>%
+  mutate(proportion = n / sum(n))
+
+my_data %>%
+  group_by(DEATH_EVENT) %>%
+  count(diabetes) %>%
+  mutate(proportion = n / sum(n))
+
+my_data %>%
+  group_by(DEATH_EVENT) %>%
+  count(high_blood_pressure) %>%
+  mutate(proportion = n / sum(n))
+
+my_data %>%
+  group_by(DEATH_EVENT) %>%
+  count(sex) %>%
+  mutate(proportion = n / sum(n))
+
+my_data %>%
+  group_by(DEATH_EVENT) %>%
+  count(smoking) %>%
+  mutate(proportion = n / sum(n))
+```
+
+# Survival prediction classifiers
+```{r}
+#Splitting to training and testing
+my_data$DEATH_EVENT <- as.factor(my_data$DEATH_EVENT)
+set.seed(0)
+indexes <- sample(1:nrow(my_data), size = 0.7 * nrow(my_data))
+train_data <- my_data[indexes, ]
+test_data <- my_data[-indexes, ]
+```
+
+## K-Nearest Neighbors (KNN)
+```{r}
+k_seq <- seq(from = 1, to = 100, by = 5)
+# Initialize vectors for errors
+train_error_seq <- test_error_seq <- NULL
+train_error_seq_scaled <- test_error_seq_scaled <- NULL
+
+for(k_ind in seq_along(k_seq)){
+k <- k_seq[k_ind]
+fit_knn <- knn3(DEATH_EVENT ~ ., data = train_data, k = k) 
+pred_knn <- predict(fit_knn, newdata = train_data, type = "class") 
+train_error_seq[k_ind] <- mean(pred_knn != train_data$DEATH_EVENT)
+pred_knn <- predict(fit_knn, newdata = test_data, type = "class") 
+test_error_seq[k_ind] <- mean(pred_knn != test_data$DEATH_EVENT)
+}
+knn_re <- rbind(data.frame(K = k_seq, error = train_error_seq, type = "train"),
+                data.frame(K = k_seq, error = test_error_seq, type = "test"))
+
+# Repeat the analysis for scaled data
+fit_std <- preProcess(train_data[, -ncol(train_data)], method = "scale") 
+dat_std <- predict(fit_std, newdata = train_data[, -ncol(train_data)]) 
+dat_std <- data.frame(dat_std, Outcome = train_data[, ncol(train_data)])
+test_dat_std <- predict(fit_std, newdata = test_data[, -ncol(test_data)])
+test_dat_std <- data.frame(test_dat_std, Outcome = test_data[, ncol(test_data)])
+
+for(k_ind in seq_along(k_seq)) { 
+  k <- k_seq[k_ind]
+  # Fit the KNN model on scaled data
+fit_knn_scaled <- knn3(Outcome ~ ., data = dat_std, k = k)
+  # Predict on the scaled training data
+pred_knn_train_scaled <- predict(fit_knn_scaled, newdata = dat_std, 
+                                 type = "class")
+train_error_seq_scaled[k_ind] <- mean(pred_knn_train_scaled != dat_std$Outcome)
+  # Predict on the scaled test data
+pred_knn_test_scaled <- predict(fit_knn_scaled, newdata = test_dat_std, 
+                                type = "class")
+test_error_seq_scaled[k_ind] <- mean(pred_knn_test_scaled != test_dat_std$Outcome) 
+}
+# Combine the errors into one data frame for plotting
+knn_re_scaled <- rbind(data.frame(K = k_seq, error = train_error_seq_scaled, 
+                                  type = "train_scaled"),
+data.frame(K = k_seq, error = test_error_seq_scaled, type = "test_scaled"))
+
+
+# Combine with the original knn_re data
+knn_re_all <- rbind(knn_re, knn_re_scaled)
+
+mytheme <- theme(axis.title = element_text(size = 20),
+axis.text = element_text(size = 10), 
+legend.text = element_text(size = 10), 
+legend.title = element_text(size = 10))
+# Plot the results
+ggplot(knn_re_all, aes(x = K, y = error, color = type)) + 
+  geom_point(size = 1) +
+  geom_line(size = 1) +
+  mytheme +
+  scale_color_manual(values = c("train" = "blue", 
+                              "test" = "red", 
+                              "train_scaled" = "lightblue",
+                                "test_scaled" = "pink"))
+```
+Selection of optimal K for KNN
+```{r}
+train_control <- trainControl(method = "cv", number = 10)
+tune_grid <- expand.grid(k = 1:100)
+set.seed(0)
+knn_tuned <- train(
+  x = dat_std[, -ncol(dat_std)], 
+  y = train_data$DEATH_EVENT,
+  method = "knn",
+  tuneGrid = tune_grid,
+  trControl = train_control
+)
+# View the best k value
+knn_tuned$bestTune
+# Plot the performance of different k values
+plot(knn_tuned)
+
+```
+
+The optimal k=9
+```{r}
+set.seed(0)
+kstd <- preProcess(train_data[, -ncol(train_data)], method = c("center", "scale"))
+ktrstd <- predict(kstd, train_data[, -ncol(train_data)])
+ktrstd <- data.frame(ktrstd, DEATH_EVENT = train_data[, ncol(train_data)])
+ktestd <- predict(kstd, test_data[, -ncol(test_data)])
+ktestd <- data.frame(ktestd, DEATH_EVENT = test_data[, ncol(test_data)])
+
+fit_optk <- knn3(DEATH_EVENT~ ., data = ktrstd, k = 9)
+pred_k9 <- predict(fit_optk, newdata = ktrstd, type = "class")
+pred_k9_t <- predict(fit_optk, newdata=ktestd, type="class")
+k9_err <- mean(pred_k9 != ktrstd$DEATH_EVENT)
+k9_t_err <- mean(pred_k9_t != ktestd$DEATH_EVENT)
+optk.met <- confusionMatrix(pred_k9, ktrstd$DEATH_EVENT)
+optk_te.met <- confusionMatrix(pred_k9_t, ktestd$DEATH_EVENT)
+```
+```{r}
+KNN_summary <- data.frame(Dataset=c("Train", "Test"), 
+                          Accuracy=c(optk.met$overall['Accuracy'], 
+                                     optk_te.met$overall['Accuracy']),
+                          Error=c(k9_err, k9_t_err),
+                          Sensitivity=c(optk.met$byClass['Sensitivity'], 
+                                        optk_te.met$byClass['Sensitivity']),
+                          Specificity=c(optk.met$byClass['Specificity'], 
+                                        optk_te.met$byClass['Specificity']))
+kbl(KNN_summary)
+```
+
+## Lasso
+```{r}
+x_tr <- as.matrix(train_data[, -13]) 
+y_tr <- train_data[, 13, drop = T] 
+if(is.factor(y_tr)) {
+  y_tr <- as.numeric(as.character(y_tr))
+}
+x_te <- as.matrix(test_data[, -13]) 
+y_te <- test_data[, 13, drop = T]
+if(is.factor(y_te)) {
+  y_te <- as.numeric(as.character(y_te))
+}
+
+# with standardization
+std_fit <- preProcess(x_tr, method = c("center", "scale")) 
+x_tr_std <- predict(std_fit, x_tr)
+x_te_std <- predict(std_fit, x_te)
+
+fit_lasso <- glmnet(x_tr_std, y_tr) 
+plot_glmnet(fit_lasso)
+
+
+set.seed(0)
+lasso.fit <- cv.glmnet(x_tr_std, y_tr, nfolds = 10, 
+                       alpha=1, family = "binomial")
+plot(lasso.fit)
+coef(lasso.fit, s="lambda.min")
+
+opt_lambda <- lasso.fit$lambda.min
+opt_lambda
+
+lasso_pred <- predict(lasso.fit, newx = x_tr_std, s = "lambda.min",
+                      type = "response")
+lasso_pred.te <- predict(lasso.fit, newx=x_te_std, s ="lambda.min",
+                         type = "response")
+lasso_pred_labels <- factor(ifelse(lasso_pred > 0.5, "1", "0"))
+lasso_pred_labels <- factor(lasso_pred_labels, levels = c("0", "1"))
+lasso_pred.te_labels <- factor(ifelse(lasso_pred.te > 0.5, "1", "0"))
+lasso_pred.te_labels <- factor(lasso_pred.te_labels, levels = c("0", "1"))
+y_tr <- factor(y_tr, levels = c(0, 1))
+y_te <- factor(y_te, levels = c(0, 1))
+la_tr.met <- confusionMatrix(lasso_pred_labels, y_tr)
+la_te.met <- confusionMatrix(lasso_pred.te_labels, y_te)
+tr_error <- mean(lasso_pred_labels != y_tr)
+te_error <- mean(lasso_pred.te_labels != y_te)
+
+lasso_summary <- data.frame(Dataset=c("Train", "Test"), 
+                            Accuracy=c(la_tr.met$overall['Accuracy'], 
+                                       la_te.met$overall['Accuracy']), 
+                          Error=c(tr_error, te_error),
+                          Sensitivity=c(la_tr.met$byClass['Sensitivity'], 
+                                        la_te.met$byClass['Sensitivity']),
+                          Specificity=c(la_tr.met$byClass['Specificity'], 
+                                        la_te.met$byClass['Specificity']))
+kbl(lasso_summary)
+```
+
+## Decision Tree with Cross-Validation Pruning
+```{r}
+my_control <- tree.control(nrow(train_data), minsize = 2, mindev = 0) 
+fit <- tree(DEATH_EVENT ~ .,
+            control = my_control,
+            data = train_data)
+
+set.seed(0)
+cv.sal <- cv.tree(fit)
+cv.sal_df <- data.frame(size = cv.sal$size, deviance = cv.sal$dev) 
+best_size <- min(cv.sal$size[cv.sal$dev == min(cv.sal$dev)])
+
+ggplot(cv.sal_df, aes(x = size, y = deviance)) + geom_point(size = 3) +
+  geom_line() +
+  geom_vline(xintercept = best_size, col = "red")
+
+sal_tree_final <- prune.tree(fit, best = best_size) 
+plot(sal_tree_final)
+text(sal_tree_final)
+
+
+pred.tree <- predict(sal_tree_final, type="class")
+dt.tr_err <- mean(pred.tree != train_data$DEATH_EVENT)
+trtre.met <-confusionMatrix(pred.tree, train_data$DEATH_EVENT)
+pred.tree.te <- predict(sal_tree_final, newdata = test_data, type = "class")
+dt.te_err <- mean(pred.tree.te != test_data$DEATH_EVENT)
+tetre.met <- confusionMatrix(pred.tree.te, test_data$DEATH_EVENT)
+
+DT_summary <- data.frame(Dataset=c("Train", "Test"), 
+                         Accuracy=c(trtre.met$overall['Accuracy'], 
+                                    tetre.met$overall['Accuracy']), 
+                          Error=c(dt.tr_err, dt.te_err),
+                          Sensitivity=c(trtre.met$byClass['Sensitivity'], 
+                                        tetre.met$byClass['Sensitivity']),
+                          Specificity=c(trtre.met$byClass['Specificity'], 
+                                        tetre.met$byClass['Specificity']))
+kbl(DT_summary)
+```
+
+## Random forest
+```{r}
+set.seed(0)
+rf.sale <- randomForest(DEATH_EVENT ~ .,
+                        data = train_data, ntree = 500, importance = TRUE)
+yhat.rf_tr <- predict(rf.sale)
+train_error <- mean(yhat.rf_tr != train_data$DEATH_EVENT) 
+met1 <-confusionMatrix(yhat.rf_tr, train_data$DEATH_EVENT)
+
+yhat.rf_te <- predict(rf.sale, newdata = test_data) 
+test_error <- mean(yhat.rf_te != test_data$DEATH_EVENT) 
+met2 <- confusionMatrix(yhat.rf_te, test_data$DEATH_EVENT)
+
+importance(rf.sale)
+varImpPlot(rf.sale)
+
+summary <- data.frame(Dataset=c("Train", "Test"), 
+                      Accuracy=c(met1$overall['Accuracy'],
+                                 met2$overall['Accuracy']), 
+                          Error=c(train_error, test_error),
+                          Sensitivity=c(met1$byClass['Sensitivity'], 
+                                        met2$byClass['Sensitivity']),
+                          Specificity=c(met1$byClass['Specificity'], 
+                                        met2$byClass['Specificity']))
+kbl(summary)
+```
+
+## Boosting
+```{r}
+set.seed(0)
+boost.type <- gbm(DEATH_EVENT ~ .,
+                  data = train_data, distribution = "multinomial",
+                  n.trees = 5000, interaction.depth = 1, cv.folds = 5)
+summary(boost.type)
+
+boost.prob_tr <- predict(boost.type, type = "response")
+boost.pred_tr <- levels(train_data$DEATH_EVENT)[apply(boost.prob_tr, 1, which.max)] 
+y.boostf <- factor(boost.pred_tr, levels = levels(train_data$DEATH_EVENT))
+ybst.met <- confusionMatrix(y.boostf, train_data$DEATH_EVENT)
+train_error_bst <- mean(boost.pred_tr != train_data$DEATH_EVENT)
+
+boost.prob_te <- predict(boost.type, newdata = test_data, n.trees = 5000, 
+                         type = "response") 
+boost.pred_te <- levels(test_data$DEATH_EVENT)[apply(boost.prob_te, 1, which.max)] 
+yhat.boostf <- factor(boost.pred_te, levels = levels(test_data$DEATH_EVENT))
+yhatb.met <- confusionMatrix(yhat.boostf, test_data$DEATH_EVENT)
+test_error_bst <- mean(boost.pred_te != test_data$DEATH_EVENT)
+
+Bst_summary <- data.frame(Dataset=c("Train", "Test"), 
+                          Accuracy=c(ybst.met$overall['Accuracy'], 
+                                     yhatb.met$overall['Accuracy']), 
+                          Error=c(train_error_bst, test_error_bst),
+                          Sensitivity=c(ybst.met$byClass['Sensitivity'], 
+                                        yhatb.met$byClass['Sensitivity']),
+                          Specificity=c(ybst.met$byClass['Specificity'], 
+                                        yhatb.met$byClass['Specificity']))
+kbl(Bst_summary)
+```
+
+# Model evaluation (summary table & ROC/AUC analysis)
+```{r}
+#Train model summary
+Model.tr_summary <- data.frame(Models=c("KNN", "Lasso","Decision Tree",
+                                        "Random Forest","Boosting"), 
+                               Accuracy=c(optk.met$overall['Accuracy'],
+                                          la_tr.met$overall['Accuracy'],
+                                          trtre.met$overall['Accuracy'], 
+                                          met1$overall['Accuracy'], 
+                                          ybst.met$overall['Accuracy']), 
+                          Error=c(k9_err, tr_error,dt.tr_err, train_error, 
+                                  train_error_bst),
+                          Sensitivity=c(optk.met$byClass['Sensitivity'],
+                                        la_tr.met$byClass['Sensitivity'],
+                                        trtre.met$byClass['Sensitivity'], 
+                                        met1$byClass['Sensitivity'], 
+                                        ybst.met$byClass['Sensitivity']),
+                          Specificity=c(optk.met$byClass['Specificity'],
+                                        la_tr.met$byClass['Specificity'],
+                                        trtre.met$byClass['Specificity'], 
+                                        met1$byClass['Specificity'], 
+                                        ybst.met$byClass['Specificity']))
+kbl(Model.tr_summary)
+
+#Test model summary
+Model.te_summary <- data.frame(Models=c("KNN", "Lasso","Decision Tree",
+                                        "Random Forest","Boosting"), 
+                               Accuracy=c(optk_te.met$overall['Accuracy'],
+                                          la_te.met$overall['Accuracy'],
+                                          tetre.met$overall['Accuracy'], 
+                                          met2$overall['Accuracy'], 
+                                          yhatb.met$overall['Accuracy']), 
+                          Error=c(k9_t_err, te_error,dt.te_err, 
+                                  test_error, test_error_bst),
+                          Sensitivity=c(optk_te.met$byClass['Sensitivity'],
+                                        la_te.met$byClass['Sensitivity'],
+                                        tetre.met$byClass['Sensitivity'], 
+                                        met2$byClass['Sensitivity'], 
+                                        yhatb.met$byClass['Sensitivity']),
+                          Specificity=c(optk_te.met$byClass['Specificity'],
+                                        la_te.met$byClass['Specificity'],
+                                        tetre.met$byClass['Specificity'], 
+                                        met2$byClass['Specificity'], 
+                                        yhatb.met$byClass['Specificity']))
+kbl(Model.te_summary)
+```
+
+```{r}
+knn.roc <- roc(test_data$DEATH_EVENT, as.numeric(pred_k9_t))
+knn.auc <- auc(knn.roc)
+lasso.roc <- roc(test_data$DEATH_EVENT, as.numeric(lasso_pred.te_labels))
+lasso.auc <- auc(lasso.roc)
+dt.roc <- roc(test_data$DEATH_EVENT, as.numeric(pred.tree.te))
+dt.auc <- auc(dt.roc)
+rdf.roc <- roc(test_data$DEATH_EVENT, as.numeric(yhat.rf_te))
+rdf.auc <- auc(rdf.roc)
+bst.roc <- roc(test_data$DEATH_EVENT, as.numeric(yhat.boostf))
+bst.auc<- auc(bst.roc)
+
+rocobjs <- list(KNN = knn.roc, Lasso = lasso.roc, DeciTree=dt.roc, 
+                RdmForest =rdf.roc, Boosting=bst.roc)
+methods_auc <- paste(c("KNN9","Lasso","Deci Tree","Rdm Forest","Boosting"),
+"AUC = ", round(c(knn.auc, lasso.auc, dt.auc,rdf.auc, bst.auc),3))
+ggroc(rocobjs, size = 1, alpha = 0.5) +
+scale_color_discrete(labels = methods_auc) +
+mytheme
+```
+
+
+
+**something to note:**
+- standardization
+- visualization not just for each variable, combining several variables (e.g. 2-3 different variables)
